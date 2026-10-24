@@ -685,6 +685,19 @@ async function renderAccounts() {
     </div>
     <details class="pastebox">
       <summary>Paste cookies manually instead</summary>
+      <div class="howto">
+        <p><strong>Where to get the file</strong></p>
+        <ol>
+          <li>Install a cookie exporter — <strong>Cookie-Editor</strong> or <strong>Get cookies.txt LOCALLY</strong> (Chrome, Edge and Firefox all have them).</li>
+          <li>Open the site you want (instagram.com, reddit.com, vimeo.com…) and <strong>sign in normally</strong> in that tab.</li>
+          <li>Click the extension → <strong>Export → Export as Netscape / cookies.txt</strong>.</li>
+          <li>Paste the whole block below. It looks like:<br />
+            <code># Netscape HTTP Cookie File<br />
+            .instagram.com&nbsp;&nbsp;TRUE&nbsp;&nbsp;/&nbsp;&nbsp;TRUE&nbsp;&nbsp;0&nbsp;&nbsp;sessionid&nbsp;&nbsp;abc123…</code></li>
+        </ol>
+        <p class="hint">Cookies are sent only to the site that issued them, and never leave this server.
+        You can delete them at any time with <strong>forget</strong> next to the site.</p>
+      </div>
       <textarea id="cookieText" placeholder="# Netscape HTTP Cookie File&#10;.instagram.com&#9;TRUE&#9;/&#9;TRUE&#9;0&#9;sessionid&#9;value"></textarea>
       <div class="actions"><button id="btnSaveCookies" class="btn-primary">Save cookies</button></div>
     </details>`;
