@@ -168,6 +168,33 @@ a disk back to `render.yaml`:
 ```
 and set `KAIGAKURE_DATA=/data` in `envVars`. Disks bill at $0.25/GB/month, prorated.
 
+#### Keeping it awake (optional)
+
+A free service spins down after **15 minutes** of no inbound traffic, and the next request then waits
+**about a minute** for the cold start. If that pause bothers you, ping it on a schedule.
+
+The Hermes cron job `Kaigakure keepalive` (`fa7faa906ffe`) does this every 10 minutes:
+
+```bash
+bash ~/AppData/Local/hermes/scripts/kaigakure_keepalive.sh
+```
+
+It hits `/api/health` — the route that actually touches the running Node process, so a 200 means the
+instance is genuinely warm, not just serving a cached page. It stays silent when everything is fine and
+only reports a cold start or a failure.
+
+Two things to know before relying on it:
+
+- **The Hermes gateway must be running.** It is installed as a Windows login item, so it starts with
+  your PC. Check with `hermes gateway status`.
+- **It only runs while your PC is on.** This is a local cron, not a cloud one — if the machine is off,
+  nothing pings the service. For a pinger that works regardless, use an external service pointed at
+  `https://kaigakure.onrender.com/api/health` (UptimeRobot and cron-job.org both have free tiers).
+
+**Worth knowing:** keeping a free service warm all month costs nothing extra in instance hours — Render
+grants 750 free hours per workspace per month, which is 31 days, and a spun-down service consumes none.
+So a 10-minute ping is genuinely free.
+
 ### 2. Docker anywhere (Fly, Railway, a VPS)
 
 ```bash
