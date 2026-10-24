@@ -1,0 +1,23 @@
+# Kaigakure on Render — free tier.
+#
+# No persistent disk (Render allows disks on paid services only), so nothing is
+# declared here. Free instances still have a normal writable filesystem, so
+# downloads, ZIPs and jobs work exactly as usual — they just live in the
+# container's ephemeral app/data and disappear on a restart or redeploy.
+#
+# That is fine for how Kaigakure is used: every file is streamed to the browser
+# the moment it is ready, so nothing needs to survive. The only thing lost is
+# saved sign-in sessions; re-paste cookies after a restart if you use them.
+services:
+  - type: web
+    name: kaigakure
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # KAIGAKURE_DATA is intentionally left unset: paths.js then keeps data
+      # inside the container (app/data), which free tier can write to.
+

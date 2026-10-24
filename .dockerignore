@@ -1,0 +1,13 @@
+# Keep the build context small. Without this, Docker sends node_modules,
+# .venv and data/ to the daemon — hundreds of MB of junk that the build then
+# discards anyway.
+node_modules
+.venv
+venv
+data
+screenshots
+*.log
+.git
+.gitignore
+*.md
+!README.md

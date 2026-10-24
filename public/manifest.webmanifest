@@ -1,0 +1,22 @@
+{
+  "name": "Kaigakure — Hidden Media",
+  "short_name": "Kaigakure",
+  "description": "Paste a social media link and reveal every photo, video and audio track inside it.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07080f",
+  "theme_color": "#0a0b14",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": { "title": "title", "text": "shared_link", "url": "url" }
+  }
+}

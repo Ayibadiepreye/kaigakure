@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Kaigakure — Hidden Media</title>
+<meta name="description" content="Paste a link. See every photo, video and audio track it contains. Pick what you want. Download." />
+<meta name="theme-color" content="#0a0b14" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Kaigakure" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="mist" aria-hidden="true"><span></span><span></span><span></span></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+      <defs>
+        <linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#7c5cff"/><stop offset="55%" stop-color="#c084fc"/><stop offset="100%" stop-color="#38bdf8"/>
+        </linearGradient>
+      </defs>
+      <path d="M24 3c6 5 6 11 1 15-4 3-4 8 0 11 5 4 5 9 0 14-2 2-3 2-5 1 7-4 8-11 3-15-4-4-4-9 0-13 5-4 5-9 1-13z" fill="url(#mg)" opacity=".92"/>
+      <circle cx="14" cy="15" r="3.4" fill="#c084fc" opacity=".75"/>
+      <circle cx="35" cy="29" r="2.6" fill="#38bdf8" opacity=".7"/>
+      <circle cx="20" cy="34" r="1.8" fill="#f0abfc" opacity=".6"/>
+    </svg>
+    <div class="brandtext">
+      <h1>Kaigakure</h1>
+      <p>霞がくれ · hidden mist</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button id="btnPwa" class="btn-ghost" hidden>Install app</button>
+    <button id="btnCookies" class="btn-ghost">Cookies</button>
+    <button id="btnHistory" class="btn-ghost">History</button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <h2>Drop a link.<br /><span class="grad">Uncover everything inside it.</span></h2>
+    <p class="sub">Kaigakure reads a social post and reveals every photo, video and audio track it carries — then downloads exactly what you select.</p>
+
+    <form id="form" class="urlbar" autocomplete="off">
+      <svg class="url-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
+      <input id="url" type="url" inputmode="url" placeholder="Paste a post link — YouTube, TikTok, Telegram, X…" spellcheck="false" required />
+      <button id="btnPaste" type="button" class="btn-ghost paste">Paste</button>
+      <button id="btnGo" type="submit" class="btn-primary">Reveal</button>
+    </form>
+
+    <div class="chips" id="chips">
+      <span class="chip-label">Try:</span>
+      <button class="chip" data-demo="youtube">YouTube</button>
+      <button class="chip" data-demo="soundcloud">SoundCloud</button>
+      <button class="chip" data-demo="tiktok">TikTok</button>
+      <button class="chip" data-demo="telegram">Telegram</button>
+      <button class="chip" data-demo="instagram">Instagram</button>
+    </div>
+  </section>
+
+  <section id="result" class="result" hidden>
+    <div class="result-head">
+      <div class="meta">
+        <span id="platformBadge" class="badge">—</span>
+        <h3 id="title">—</h3>
+        <p id="submeta" class="muted"></p>
+      </div>
+      <button id="btnReset" class="btn-ghost">New link</button>
+    </div>
+
+    <div id="cookieWarn" class="notice" hidden></div>
+
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Quality</label>
+        <div class="segmented" id="quality">
+          <button data-q="best" class="on">Best</button>
+          <button data-q="hd">HD ≤1080</button>
+          <button data-q="sd">SD ≤480</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <label>Audio format</label>
+        <div class="segmented" id="audioFmt">
+          <button data-a="mp3" class="on">MP3</button>
+          <button data-a="m4a">M4A</button>
+          <button data-a="opus">Opus</button>
+        </div>
+      </div>
+      <div class="ctrl-group grow">
+        <label>Show</label>
+        <div class="segmented" id="mode">
+          <button data-m="all" class="on">Everything</button>
+          <button data-m="photos">Photos</button>
+          <button data-m="videos">Videos</button>
+          <button data-m="audio">Audio</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="select-head">
+      <div class="bulk">
+        <button id="btnAll" class="btn-ghost sm">Select all</button>
+        <button id="btnNone" class="btn-ghost sm">Clear</button>
+      </div>
+      <span id="selCount" class="muted">0 selected</span>
+    </div>
+
+    <div id="grid" class="grid"></div>
+
+    <div class="actions">
+      <button id="btnDownload" class="btn-primary big" disabled>Download selection</button>
+      <button id="btnZip" class="btn-ghost big" disabled>ZIP selected</button>
+    </div>
+  </section>
+
+  <section id="progress" class="progress-card" hidden>
+    <div class="spinner"></div>
+    <div class="ptext">
+      <strong id="pLabel">Working…</strong>
+      <span id="pDetail" class="muted"></span>
+    </div>
+    <div class="bar"><i id="pBar"></i></div>
+  </section>
+
+  <section id="done" class="done-card" hidden>
+    <h3 id="doneTitle">Done</h3>
+    <ul id="fileList" class="filelist"></ul>
+    <div id="folderBox" class="folderbox" hidden></div>
+    <p id="zipSaved" class="hint" hidden></p>
+    <div class="actions">
+      <button id="btnZip2" class="btn-primary">Download ZIP</button>
+      <button id="btnAgain" class="btn-ghost">Start over</button>
+    </div>
+  </section>
+
+  <section id="errorBox" class="error-card" hidden></section>
+</main>
+
+<footer class="foot">
+  <p>Kaigakure runs on your own machine · it only reaches what a signed-out visitor can already see<br />
+     <span class="hint">Instagram, Reddit, Facebook, Vimeo and X need a signed-in session for private posts — use the <strong>Sign in</strong> button.</span>
+</footer>
+
+<div id="modal" class="modal" hidden>
+  <div class="sheet">
+    <button class="sheet-close" data-close aria-label="Close">&times;</button>
+    <h3 id="modalTitle">Title</h3>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="/app.js" type="module"></script>
+</body>
+</html>
