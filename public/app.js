@@ -458,6 +458,15 @@ function renderFiles(job) {
 
   show($('#done'), true);
   $('#done').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Batch save: only useful where a folder can be written to.
+  const all = $('#btnSaveAll');
+  if (all) {
+    const usable = job.files.filter((f) => !f.failed).length;
+    show(all, usable > 0);
+    all.textContent = `Save all to folder${usable > 1 ? ` (${usable})` : ''}`;
+    all.onclick = () => saveAllToFolder(job.id, job.files);
+  }
 }
 
 /* ---------------- download folder ---------------- */
@@ -522,16 +531,79 @@ async function saveOne(jobId, fileName) {
   if (SAVE_FOLDER_OK && (await getSaveFolder())) {
     const where = await saveFileToFolder(jobId, fileName);
     if (where) {
-      const note = $('#savedNote');
-      if (note) {
-        note.textContent = `Saved to ${where}`;
-        show(note, true);
-      }
+      setSavedNote(`Saved to ${where}`);
       return;
     }
   }
   // No folder chosen (or not supported): plain browser download.
   window.location.assign(`/api/jobs/${jobId}/file/${encodeURIComponent(fileName)}`);
+}
+
+/**
+ * Save every finished file into the chosen folder, one at a time.
+ *
+ * Sequential on purpose: firing several downloads at once makes browsers
+ * silently drop all but the last one. We fetch each file fully, then write it,
+ * then move on — so nothing is lost.
+ */
+async function saveAllToFolder(jobId, files) {
+  const btn = $('#btnSaveAll');
+  const ok = files.filter((f) => !f.failed);
+  if (!ok.length) return;
+
+  const supported = SAVE_FOLDER_OK && (await getSaveFolder());
+  btn.disabled = true;
+
+  let done = 0;
+  let failed = 0;
+
+  for (const f of ok) {
+    btn.textContent = `Saving ${done + 1} of ${ok.length}…`;
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/file/${encodeURIComponent(f.name)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+
+      if (supported) {
+        const dir = await getSaveFolder();
+        const fh = await dir.getFileHandle(f.name, { create: true });
+        const w = await fh.createWritable();
+        await w.write(blob);
+        await w.close();
+      } else {
+        // No folder support: trigger a real download per file, spaced out.
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = f.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        // Give the browser a beat so it does not cancel the previous download.
+        await new Promise((r) => setTimeout(r, 700));
+      }
+      done++;
+    } catch {
+      failed++;
+    }
+  }
+
+  btn.textContent = 'Save all to folder';
+  btn.disabled = false;
+  if (failed) {
+    setSavedNote(`Saved ${done} of ${ok.length} — ${failed} failed.`);
+  } else {
+    const dir = await getSaveFolder();
+    setSavedNote(`Saved ${done} file${done === 1 ? '' : 's'} to ${dir ? dir.name : 'your device'}.`);
+  }
+}
+
+function setSavedNote(text) {
+  const note = $('#savedNote');
+  if (!note) return;
+  note.textContent = text;
+  show(note, true);
 }
 
 /* ---------------- history ---------------- */
@@ -758,6 +830,10 @@ async function renderAccounts() {
 $('#modal').addEventListener('click', (e) => {
   if (e.target.id === 'modal' || e.target.hasAttribute('data-close')) closeModal();
 });
+
+// Exposed for tests and for power users poking at the console. Harmless in
+// normal use — these are the same functions the buttons call.
+window.kaigakure = { saveAllToFolder, saveOne, downloadSingle };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
 /* ---------------- PWA ---------------- */

@@ -115,9 +115,10 @@
     <div id="grid" class="grid"></div>
 
     <div class="actions">
-      <button id="btnDownload" class="btn-primary big" disabled>Download selection</button>
-      <button id="btnZip" class="btn-ghost big" disabled>ZIP selected</button>
+      <button id="btnDownload" class="btn-primary big" disabled>Download selected (separate files)</button>
+      <button id="btnZip" class="btn-ghost big" disabled>ZIP selected (one file)</button>
     </div>
+    <p class="hint center">Each item downloads as its own photo, video or audio file — nothing is bundled unless you choose ZIP.</p>
   </section>
 
   <section id="progress" class="progress-card" hidden>
@@ -136,7 +137,8 @@
     <div id="folderBox" class="folderbox" hidden></div>
     <p id="zipSaved" class="hint" hidden></p>
     <div class="actions">
-      <button id="btnZip2" class="btn-primary">Download ZIP</button>
+      <button id="btnSaveAll" class="btn-primary">Save all to folder</button>
+      <button id="btnZip2" class="btn-ghost">Download ZIP</button>
       <button id="btnAgain" class="btn-ghost">Start over</button>
     </div>
   </section>

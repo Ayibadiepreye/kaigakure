@@ -255,6 +255,9 @@ main {
   word-break: break-word;
 }
 .muted { color: var(--muted); font-size: 0.86rem; }
+/* Small explanatory text. Scoped so each block can restyle it. */
+.hint { color: var(--muted-foreground); font-size: 0.8rem; }
+.hint.center { text-align: center; margin: -4px 0 0; }
 
 .notice {
   margin: 16px 0 0;

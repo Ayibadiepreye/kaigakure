@@ -55,3 +55,29 @@ test('platform metadata is present for every detected key', () => {
     assert.ok(meta.color.startsWith('#'), `bad color for ${key}`);
   }
 });
+
+test('safeName produces header-safe ASCII file names', async () => {
+  const { safeName } = await import('../server/lib/jobs.js');
+  // Non-Latin and emoji names used to crash Node with ERR_INVALID_CHAR when
+  // they reached a Content-Disposition header.
+  for (const input of ['日本語のタイトル_01.mp4', 'emoji_😀_01.jpg', 'Видео_01.mp4', 'café_01.jpg']) {
+    const out = safeName(input);
+    assert.match(out, /^[\x20-\x7e]+$/, `${input} -> ${out} must be printable ASCII`);
+    assert.ok(out.length > 0);
+  }
+  assert.equal(safeName('   '), 'media');
+  assert.equal(safeName('a/b\c:d*e?f"g<h>i|j'), 'abcdefghij');
+});
+
+test('contentDisposition never throws for any filename', async () => {
+  const { contentDisposition } = await import('../server/lib/jobs.js');
+  const http = await import('node:http');
+  const cases = ['kaigakure_01.jpg', '日本語_01.jpg', 'emoji_😀_01.jpg', 'line\nbreak.jpg', 'a"b_01.jpg', ''];
+  for (const name of cases) {
+    const value = contentDisposition(name);
+    assert.ok(value.startsWith('attachment'));
+    // The whole point: this must not throw.
+    const res = new http.ServerResponse({ method: 'GET' });
+    res.setHeader('Content-Disposition', value);
+  }
+});

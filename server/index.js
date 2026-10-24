@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { probe } from './lib/extract.js';
-import { createJob, getJob, listJobs, zipJob, deleteJob } from './lib/jobs.js';
+import { createJob, getJob, listJobs, zipJob, deleteJob, contentDisposition } from './lib/jobs.js';
 import { proxyImage, streamRemote } from './lib/net.js';
 import { detectPlatform, platformMeta, COOKIE_HINT, PLATFORMS } from './lib/platforms.js';
 import { PUBLIC_DIR, cookiesExist, COOKIE_FILE } from './lib/paths.js';
@@ -114,7 +114,7 @@ app.get('/api/jobs/:id/zip', async (req, res) => {
   const zipPath = await zipJob(job);
   const name = path.basename(zipPath);
   res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  res.setHeader('Content-Disposition', contentDisposition(name));
   fs.createReadStream(zipPath).pipe(res);
 });
 
@@ -131,7 +131,7 @@ app.get('/api/jobs/:id/file/:name', (req, res) => {
   const use = fs.existsSync(filePath) ? filePath : alt;
   if (!fs.existsSync(use)) return res.status(404).json({ error: 'File missing on disk.' });
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${safe}"`);
+  res.setHeader('Content-Disposition', contentDisposition(safe));
   fs.createReadStream(use).pipe(res);
 });
 

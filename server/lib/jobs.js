@@ -35,14 +35,41 @@ function publicJob(j) {
 const UNSAFE = /[\/:*?"<>|]/g;
 const CONTROL = /[\u0000-\u001f\u007f]/g;
 
-function safeName(s, fallback = 'media') {
+export function safeName(s, fallback = 'media') {
   const cleaned = String(s || '')
+    .normalize('NFKD')
     .replace(CONTROL, '')
     .replace(UNSAFE, '')
     .replace(/\s+/g, '_')
+    // Drop anything outside printable ASCII. Non-Latin names are fine on disk
+    // but crash Node when they reach a Content-Disposition header.
+    .replace(/[^\x20-\x7e]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '')
     .replace(/\.+$/, '')
     .slice(0, 80);
   return cleaned || fallback;
+}
+
+/**
+ * Build a Content-Disposition header value that survives any filename.
+ *
+ * ASCII names go in `filename="..."`; anything else uses RFC 5987
+ * `filename*=UTF-8''...`, which is what modern browsers understand. Both are
+ * sent when the name is non-ASCII so older clients still get a usable name.
+ */
+export function contentDisposition(filename) {
+  const ascii = /^[\x20-\x7e]*$/.test(filename);
+  if (ascii) {
+    // Escape quotes and backslashes so a name containing `"` cannot break out.
+    const esc = filename.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `attachment; filename="${esc}"`;
+  }
+  const encoded = encodeURIComponent(filename).replace(/['()*]/g, (c) =>
+    '%' + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+  const fallback = filename.replace(/[^\x20-\x7e]/g, '_').slice(0, 40) || 'download';
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
 /**
