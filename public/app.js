@@ -262,11 +262,15 @@ function applyMode() {
         <strong>${escapeHtml(it.title || it.type)}</strong>
         <span class="sub">${escapeHtml(metaLine)}</span>
         ${pickerHtml}
+        <div class="cardactions">
+          <button class="btn-primary btn-sm carddl" data-id="${it.id}" type="button">download</button>
+        </div>
       </div>`;
 
     card.addEventListener('click', (e) => {
-      // Clicking the quality picker must not toggle the card.
+      // Clicking the quality picker or the download button must not toggle the card.
       if (e.target.closest('.variantpick')) return;
+      if (e.target.closest('.carddl')) return;
       toggle(it.id, card);
     });
 
@@ -277,9 +281,59 @@ function applyMode() {
       });
     }
 
+    // Per-card download: grab just this one item.
+    const dl = card.querySelector('.carddl');
+    if (dl) {
+      dl.addEventListener('click', () => {
+        it.chosenVariant = picker ? variants[Number(picker.value)] || null : it.chosenVariant;
+        downloadSingle(it);
+      });
+    }
+
     grid.appendChild(card);
   }
   updateSelCount();
+}
+
+/** Download one item straight away, without the select-all flow. */
+async function downloadSingle(item) {
+  if (!state.probe) return;
+  const selection = [{
+    id: item.id,
+    type: item.type,
+    ext: item.ext,
+    url: item.url,
+    source: item.source,
+    title: item.title,
+    variant: item.chosenVariant || null,
+  }];
+
+  show($('#result'), false);
+  show($('#done'), false);
+  show($('#progress'), true);
+  $('#pLabel').textContent = 'Downloading…';
+  $('#pDetail').textContent = '1 file selected.';
+  $('#pBar').style.width = '5%';
+
+  try {
+    const res = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: state.url,
+        selection,
+        title: (state.probe.title || 'kaigakure').slice(0, 60),
+        options: { quality: state.quality, audioFormat: state.audioFormat },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Download failed');
+    state.jobId = data.id;
+    pollJob();
+  } catch (err) {
+    show($('#progress'), false);
+    showError(String(err.message || err));
+  }
 }
 
 function toggle(id, card) {
@@ -378,10 +432,14 @@ function renderFiles(job) {
     li.innerHTML = `<span class="nm">${escapeHtml(f.name)}${f.failed ? ' — failed' : ''}</span>
       <span class="sz">${f.failed ? escapeHtml(f.error || '') : fmtBytes(f.size)}</span>`;
     if (!f.failed) {
-      const a = document.createElement('a');
-      a.href = `/api/jobs/${job.id}/file/${encodeURIComponent(f.name)}`;
+      // Per-file download button. Written as a <button> so it can call the
+      // folder-aware path; a plain link would ignore the chosen folder.
+      const a = document.createElement('button');
+      a.type = 'button';
       a.className = 'sz save';
-      a.textContent = 'save';
+      a.textContent = 'download';
+      a.title = `Download ${f.name}`;
+      a.addEventListener('click', () => saveOne(job.id, f.name));
       li.querySelector('.sz').replaceWith(a);
     }
     list.appendChild(li);
@@ -454,6 +512,26 @@ async function saveFileToFolder(jobId, fileName) {
     /* fall through to browser download */
   }
   return null;
+}
+
+/**
+ * Download one finished file. If a folder was chosen, write straight into it
+ * (no Save As dialog); otherwise fall back to a normal browser download.
+ */
+async function saveOne(jobId, fileName) {
+  if (SAVE_FOLDER_OK && (await getSaveFolder())) {
+    const where = await saveFileToFolder(jobId, fileName);
+    if (where) {
+      const note = $('#savedNote');
+      if (note) {
+        note.textContent = `Saved to ${where}`;
+        show(note, true);
+      }
+      return;
+    }
+  }
+  // No folder chosen (or not supported): plain browser download.
+  window.location.assign(`/api/jobs/${jobId}/file/${encodeURIComponent(fileName)}`);
 }
 
 /* ---------------- history ---------------- */
