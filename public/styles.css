@@ -318,6 +318,120 @@ main {
   box-shadow: 0 3px 10px rgba(124, 58, 237, 0.35);
 }
 
+/* Single / multiple link switch + the batch textarea. */
+.modebar { display: flex; justify-content: center; margin: 14px 0 0; }
+.segmented.small button { padding: 5px 11px; font-size: 0.78rem; }
+
+.batchbar {
+  margin: 14px auto 0;
+  max-width: 780px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.batchbar textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 110px;
+  padding: 13px 14px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.batchbar textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18); }
+.batchbar textarea::placeholder { color: var(--muted); opacity: 0.75; }
+.batchactions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* Per-link results inside a batch. */
+.progress-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 4px;
+}
+.progress-inline .bar.slim { flex: 1; height: 5px; }
+.progress-inline .muted { font-size: 0.78rem; white-space: nowrap; }
+
+.batchlist { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.batchcard {
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.batchrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  flex-wrap: wrap;
+}
+.batchrow.pending { color: var(--muted); }
+.batchrow.failed { flex-wrap: wrap; }
+.batchrow .burl {
+  font-size: 0.8rem;
+  color: var(--muted);
+  word-break: break-all;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.batchrow .berr { font-size: 0.78rem; color: var(--err); flex: 1 1 100%; }
+.batchrow .muted { font-size: 0.76rem; }
+.batchrow .btn-ghost.sm, .batchrow .btn-primary.sm { padding: 5px 10px; font-size: 0.76rem; flex: 0 0 auto; }
+
+/* Items inside one link's batch card. */
+.bgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 7px;
+  padding: 0 13px 13px;
+}
+.bitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  font-size: 0.76rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.bitem:hover { border-color: var(--border-strong); }
+.bitem.on { border-color: var(--accent); background: rgba(139, 92, 246, 0.13); }
+.bitem input { accent-color: var(--accent); flex: 0 0 auto; }
+.bitem .btype {
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+.bitem .btype.photo { color: #86efac; }
+.bitem .btype.video { color: #fca5a5; }
+.bitem .btype.audio { color: #7dd3fc; }
+.bitem .btitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Small spinner for a link still being read. */
+.spinner.sm {
+  width: 14px; height: 14px; flex: 0 0 auto;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
 .select-head {
   display: flex;
   align-items: center;

@@ -54,6 +54,22 @@
       <button id="btnGo" type="submit" class="btn-primary">Reveal</button>
     </form>
 
+    <div class="modebar">
+      <div class="segmented small" id="linkMode">
+        <button data-lmode="single" class="on" type="button">Single link</button>
+        <button data-lmode="batch" type="button">Multiple links</button>
+      </div>
+    </div>
+
+    <form id="batchForm" class="batchbar" autocomplete="off" hidden>
+      <textarea id="batchText" rows="5" spellcheck="false"
+        placeholder="Paste several links, one per line — up to 25.&#10;https://www.youtube.com/watch?v=…&#10;https://www.instagram.com/reel/…&#10;https://t.me/channel/123"></textarea>
+      <div class="batchactions">
+        <span id="batchCount" class="muted">0 links</span>
+        <button id="btnBatchGo" type="submit" class="btn-primary">Reveal all</button>
+      </div>
+    </form>
+
     <div class="chips" id="chips">
       <span class="chip-label">Try:</span>
       <button class="chip" data-demo="youtube">YouTube</button>
@@ -61,6 +77,29 @@
       <button class="chip" data-demo="tiktok">TikTok</button>
       <button class="chip" data-demo="telegram">Telegram</button>
       <button class="chip" data-demo="instagram">Instagram</button>
+    </div>
+  </section>
+
+  <section id="batchResult" class="result" hidden>
+    <div class="result-head">
+      <div class="meta">
+        <span class="badge">BATCH</span>
+        <h3 id="batchTitle">Reading links…</h3>
+        <p id="batchSub" class="muted"></p>
+      </div>
+      <button id="btnBatchReset" class="btn-ghost">New batch</button>
+    </div>
+
+    <div id="batchProgress" class="progress-inline" hidden>
+      <div class="bar slim"><i id="batchBar"></i></div>
+      <span id="batchProgressLabel" class="muted"></span>
+    </div>
+
+    <div id="batchList" class="batchlist"></div>
+
+    <div class="actions" id="batchActions" hidden>
+      <button id="btnBatchDownload" class="btn-primary big" disabled>Download all selected</button>
+      <span id="batchSelCount" class="muted">0 selected</span>
     </div>
   </section>
 

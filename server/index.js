@@ -4,6 +4,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { probe } from './lib/extract.js';
 import { createJob, getJob, listJobs, zipJob, deleteJob, contentDisposition } from './lib/jobs.js';
+import {
+  createBatchJob,
+  getBatch,
+  listBatches,
+  deleteBatch,
+  parseBatchUrls,
+  BATCH_LIMIT,
+} from './lib/batch.js';
 import { proxyImage, streamRemote } from './lib/net.js';
 import { detectPlatform, platformMeta, COOKIE_HINT, PLATFORMS } from './lib/platforms.js';
 import { PUBLIC_DIR, cookiesExist, COOKIE_FILE } from './lib/paths.js';
@@ -68,6 +76,42 @@ app.post('/api/probe', async (req, res) => {
       platformName: platformMeta(detectPlatform(normalized)).name,
     });
   }
+});
+
+/** Start reading several links at once. Returns a batch handle to poll. */
+app.post('/api/batch', (req, res) => {
+  const raw = req.body?.urls ?? req.body?.text;
+  const urls = parseBatchUrls(raw);
+
+  if (!urls.length) {
+    return res.status(400).json({
+      error: `No usable links found. Paste up to ${BATCH_LIMIT} links, one per line.`,
+    });
+  }
+
+  const batch = createBatchJob({ urls, options: req.body?.options || {} });
+  res.json({ id: batch.id, status: batch.status, total: urls.length, urls });
+});
+
+/** Poll a batch's progress and per-link results. */
+app.get('/api/batch/:id', (req, res) => {
+  const batch = getBatch(req.params.id);
+  if (!batch) return res.status(404).json({ error: 'Batch not found.' });
+
+  res.json({
+    id: batch.id,
+    status: batch.status,
+    progress: batch.progress,
+    error: batch.error,
+    urls: batch.urls,
+    results: batch.results,
+  });
+});
+
+app.get('/api/batches', (req, res) => res.json({ batches: listBatches() }));
+
+app.delete('/api/batch/:id', (req, res) => {
+  res.json({ ok: deleteBatch(req.params.id) });
 });
 
 /** Start a download job with the user's selection. */

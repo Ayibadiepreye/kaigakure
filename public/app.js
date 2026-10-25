@@ -606,6 +606,361 @@ function setSavedNote(text) {
   show(note, true);
 }
 
+/* ---------------- batch probe ---------------- */
+const batchState = {
+  id: null,
+  results: [],
+  selected: new Map(), // index -> Set(itemId)
+  pollTimer: null,
+};
+
+/** Count non-empty, non-comment lines that look like links. */
+function countLinks(text) {
+  return text
+    .split(/[\n\r,;]+/)
+    .map((s) => s.trim())
+    .filter((s) => /^https?:\/\//i.test(s)).length;
+}
+
+function setMode(mode) {
+  const isBatch = mode === 'batch';
+  $('#batchForm').hidden = !isBatch;
+  $('#form').style.display = isBatch ? 'none' : '';
+  $('#chips').style.display = isBatch ? 'none' : '';
+  $$('#linkMode button').forEach((b) => b.classList.toggle('on', b.dataset.lmode === mode));
+}
+
+async function startBatch(text) {
+  const urls = text
+    .split(/[\n\r,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!urls.length) {
+    showError('Paste at least one link.');
+    return;
+  }
+
+  show($('#errorBox'), false);
+  show($('#result'), false);
+  show($('#done'), false);
+  show($('#batchResult'), true);
+  $('#batchTitle').textContent = 'Reading links…';
+  $('#batchSub').textContent = `${urls.length} link${urls.length === 1 ? '' : 's'} queued.`;
+  $('#batchList').innerHTML = '';
+  $('#batchActions').hidden = true;
+  show($('#batchProgress'), true);
+  $('#batchBar').style.width = '4%';
+  $('#batchProgressLabel').textContent = 'Starting…';
+  setBusy($('#batchForm'), true);
+
+  try {
+    const res = await fetch('/api/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not start the batch.');
+    batchState.id = data.id;
+    batchState.selected = new Map();
+    pollBatch();
+  } catch (err) {
+    show($('#batchProgress'), false);
+    showError(String(err.message || err));
+    setBusy($('#batchForm'), false);
+  }
+}
+
+function pollBatch() {
+  clearTimeout(batchState.pollTimer);
+  batchState.pollTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/batch/${batchState.id}`);
+      const batch = await res.json();
+      if (!res.ok) throw new Error(batch.error || 'Batch lost');
+
+      const pct = batch.progress.total
+        ? Math.round((batch.progress.done / batch.progress.total) * 100)
+        : 10;
+      $('#batchBar').style.width = `${Math.max(4, pct)}%`;
+      $('#batchProgressLabel').textContent = batch.progress.label || '';
+
+      batchState.results = batch.results || [];
+      renderBatch();
+
+      if (batch.status === 'complete' || batch.status === 'error') {
+        show($('#batchProgress'), false);
+        setBusy($('#batchForm'), false);
+        const ok = batchState.results.filter((r) => r.status === 'ok').length;
+        $('#batchTitle').textContent =
+          batch.status === 'error' ? 'Batch failed' : `Done — ${ok} of ${batchState.results.length} links`;
+        return;
+      }
+      pollBatch();
+    } catch (err) {
+      show($('#batchProgress'), false);
+      showError(String(err.message || err));
+      setBusy($('#batchForm'), false);
+    }
+  }, 700);
+}
+
+function renderBatch() {
+  const list = $('#batchList');
+  list.innerHTML = '';
+
+  let anySelectable = false;
+
+  batchState.results.forEach((r, i) => {
+    const card = document.createElement('div');
+    card.className = 'batchcard';
+
+    if (r.status === 'reading' || r.status === 'pending') {
+      card.innerHTML = `<div class="batchrow pending">
+        <span class="spinner sm"></span>
+        <span class="burl">${escapeHtml(r.url)}</span>
+        <span class="muted">reading…</span>
+      </div>`;
+      list.appendChild(card);
+      return;
+    }
+
+    if (r.status === 'error' || r.status === 'empty') {
+      const msg = r.status === 'empty' ? 'Nothing to download here' : r.error || 'Could not read';
+      card.innerHTML = `<div class="batchrow failed">
+        <span class="badge sm">${escapeHtml(r.platformName || 'Link')}</span>
+        <span class="burl">${escapeHtml(r.url)}</span>
+        <span class="berr">${escapeHtml(msg)}</span>
+      </div>`;
+      list.appendChild(card);
+      return;
+    }
+
+    // ok — a real result. Each link gets its own mini-grid of items.
+    const d = r.data;
+    const items = d.items || [];
+    if (!batchState.selected.has(i)) batchState.selected.set(i, new Set());
+    const sel = batchState.selected.get(i);
+
+    const bits = [];
+    if (d.counts) {
+      const p = [];
+      if (d.counts.video) p.push(`${d.counts.video} video`);
+      if (d.counts.audio) p.push(`${d.counts.audio} audio`);
+      if (d.counts.photo) p.push(`${d.counts.photo} photo`);
+      if (p.length) bits.push(p.join(' · '));
+    }
+
+    const rows = items
+      .map((it) => {
+        const on = sel.has(it.id);
+        return `<label class="bitem${on ? ' on' : ''}">
+          <input type="checkbox" data-batch="${i}" data-id="${escapeHtml(it.id)}" ${on ? 'checked' : ''} />
+          <span class="btype ${it.type}">${it.type}</span>
+          <span class="btitle">${escapeHtml(it.title || it.type)}</span>
+        </label>`;
+      })
+      .join('');
+
+    card.innerHTML = `
+      <div class="batchrow">
+        <span class="badge sm" ${r.platformColor ? `style="color:${r.platformColor};border-color:${r.platformColor}55;background:${r.platformColor}26"` : ''}>${escapeHtml(r.platformName || 'Link')}</span>
+        <span class="burl">${escapeHtml(r.url)}</span>
+        <span class="muted">${escapeHtml(bits.join(' ') || '')}</span>
+        <button class="btn-ghost sm" data-selall="${i}" type="button">select all</button>
+        <button class="btn-primary sm" data-dl="${i}" type="button" ${sel.size ? '' : 'disabled'}>download (${sel.size})</button>
+      </div>
+      <div class="bgrid">${rows}</div>`;
+
+    list.appendChild(card);
+    if (items.length) anySelectable = true;
+  });
+
+  // Wire up this render pass.
+  $$('#batchList input[type=checkbox]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const i = Number(cb.dataset.batch);
+      const set = batchState.selected.get(i);
+      if (!set) return;
+      if (cb.checked) set.add(cb.dataset.id);
+      else set.delete(cb.dataset.id);
+      cb.closest('.bitem').classList.toggle('on', cb.checked);
+      updateBatchCounts();
+    });
+  });
+
+  $$('#batchList [data-selall]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const i = Number(b.dataset.selall);
+      const set = batchState.selected.get(i);
+      if (!set) return;
+      const boxes = $$(`#batchList input[data-batch="${i}"]`);
+      const allOn = boxes.every((x) => x.checked);
+      boxes.forEach((x) => {
+        x.checked = !allOn;
+        x.closest('.bitem').classList.toggle('on', !allOn);
+        if (!allOn) set.add(x.dataset.id);
+        else set.delete(x.dataset.id);
+      });
+      updateBatchCounts();
+    });
+  });
+
+  $$('#batchList [data-dl]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const i = Number(b.dataset.dl);
+      const set = batchState.selected.get(i);
+      if (!set || !set.size) return;
+      const r = batchState.results[i];
+      const items = (r.data.items || []).filter((it) => set.has(it.id));
+      downloadItems(r.url, r.data.title, items, r.data);
+    });
+  });
+
+  $('#batchActions').hidden = !anySelectable;
+  updateBatchCounts();
+}
+
+function updateBatchCounts() {
+  let n = 0;
+  for (const set of batchState.selected.values()) n += set.size;
+  $('#batchSelCount').textContent = `${n} selected`;
+  $('#btnBatchDownload').disabled = n === 0;
+  // Keep each link's own download button in sync.
+  batchState.selected.forEach((set, i) => {
+    const btn = $(`#batchList [data-dl="${i}"]`);
+    if (btn) {
+      btn.disabled = !set.size;
+      btn.textContent = `download (${set.size})`;
+    }
+  });
+}
+
+/**
+ * Download a set of items from one link. Reuses the single-link job path so
+ * naming, cookies and per-platform routing all stay identical.
+ */
+async function downloadItems(url, title, items, probeData) {
+  show($('#batchResult'), false);
+  show($('#done'), false);
+  show($('#progress'), true);
+  $('#pLabel').textContent = 'Downloading…';
+  $('#pDetail').textContent = `${items.length} file(s) selected.`;
+  $('#pBar').style.width = '5%';
+
+  try {
+    const res = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        selection: items.map((i) => ({
+          id: i.id,
+          type: i.type,
+          ext: i.ext,
+          url: i.url,
+          source: i.source,
+          title: i.title,
+          variant: i.chosenVariant || null,
+        })),
+        title: (title || 'kaigakure').slice(0, 60),
+        options: { quality: state.quality, audioFormat: state.audioFormat },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Download failed');
+    state.jobId = data.id;
+    pollJob();
+  } catch (err) {
+    show($('#progress'), false);
+    showError(String(err.message || err));
+  }
+}
+
+/** Download everything ticked across every link in the batch. */
+async function downloadBatchAll() {
+  const jobs = [];
+  for (const [i, set] of batchState.selected) {
+    if (!set.size) continue;
+    const r = batchState.results[i];
+    if (!r || r.status !== 'ok') continue;
+    const items = (r.data.items || []).filter((it) => set.has(it.id));
+    if (items.length) jobs.push({ url: r.url, title: r.data.title, items });
+  }
+  if (!jobs.length) return;
+
+  // Sequential: one job at a time. Parallel jobs would compete for the same
+  // Python/Playwright processes and the free tier's 512MB.
+  show($('#batchResult'), false);
+  show($('#done'), false);
+  show($('#progress'), true);
+  $('#pLabel').textContent = `Downloading ${jobs.length} link${jobs.length === 1 ? '' : 's'}…`;
+
+  try {
+    const allFiles = [];
+    for (let k = 0; k < jobs.length; k++) {
+      const j = jobs[k];
+      $('#pDetail').textContent = `Link ${k + 1} of ${jobs.length} · ${j.items.length} file(s).`;
+      $('#pBar').style.width = `${Math.round((k / jobs.length) * 100)}%`;
+
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: j.url,
+          selection: j.items.map((i) => ({
+            id: i.id,
+            type: i.type,
+            ext: i.ext,
+            url: i.url,
+            source: i.source,
+            title: i.title,
+            variant: i.chosenVariant || null,
+          })),
+          title: (j.title || 'kaigakure').slice(0, 60),
+          options: { quality: state.quality, audioFormat: state.audioFormat },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Download failed');
+      state.jobId = data.id;
+      // Wait for this job to finish before starting the next.
+      const finished = await waitJob(data.id);
+      allFiles.push(...(finished.files || []));
+    }
+
+    show($('#progress'), false);
+    show($('#done'), true);
+    // Files from every link are pooled into one list; each was written into its
+    // own subfolder by the server, so names stay unique.
+    $('#doneTitle').textContent = `Done — ${allFiles.length} file${allFiles.length === 1 ? '' : 's'}`;
+    renderFiles({ id: state.jobId, files: allFiles });
+    $('#done').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch (err) {
+    show($('#progress'), false);
+    showError(String(err.message || err));
+  }
+}
+
+/** Resolve once a job reaches a terminal state. */
+function waitJob(jobId) {
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        const job = await res.json();
+        if (job.status === 'complete') return resolve(job);
+        if (job.status === 'error') return reject(new Error(job.error || 'Download failed'));
+        setTimeout(tick, 600);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    tick();
+  });
+}
+
 /* ---------------- history ---------------- */
 function saveHistory(url, platform) {
   state.history = [{ url, platform, at: Date.now() }, ...state.history.filter((h) => h.url !== url)].slice(0, 12);
@@ -702,6 +1057,34 @@ function resetAll() {
   state.jobId = null;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+/* ---------------- batch wiring ---------------- */
+$$('#linkMode button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.lmode)));
+
+$('#batchForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  startBatch($('#batchText').value);
+});
+
+$('#batchText').addEventListener('input', (e) => {
+  const n = countLinks(e.target.value);
+  $('#batchCount').textContent = `${n} link${n === 1 ? '' : 's'}`;
+  $('#btnBatchGo').disabled = n === 0;
+});
+
+$('#btnBatchReset').addEventListener('click', () => {
+  clearTimeout(batchState.pollTimer);
+  show($('#batchResult'), false);
+  $('#batchText').value = '';
+  $('#batchCount').textContent = '0 links';
+  $('#btnBatchGo').disabled = false;
+  batchState.results = [];
+  batchState.selected = new Map();
+  setMode('single');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+$('#btnBatchDownload').addEventListener('click', downloadBatchAll);
 
 $('#btnHistory').addEventListener('click', () => {
   if (!state.history.length) { openModal('History', '<p>Nothing yet. Links you open will show up here.</p>'); return; }
@@ -833,7 +1216,7 @@ $('#modal').addEventListener('click', (e) => {
 
 // Exposed for tests and for power users poking at the console. Harmless in
 // normal use — these are the same functions the buttons call.
-window.kaigakure = { saveAllToFolder, saveOne, downloadSingle };
+window.kaigakure = { saveAllToFolder, saveOne, downloadSingle, startBatch, downloadBatchAll };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
 /* ---------------- PWA ---------------- */

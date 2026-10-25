@@ -81,3 +81,38 @@ test('contentDisposition never throws for any filename', async () => {
     res.setHeader('Content-Disposition', value);
   }
 });
+
+test('parseBatchUrls normalises, dedupes and caps the list', async () => {
+  const { parseBatchUrls, BATCH_LIMIT } = await import('../server/lib/batch.js');
+  // Accepts a pasted blob: newlines, commas and semicolons all split.
+  const fromText = parseBatchUrls('https://a.com/1\nhttps://b.com/2,https://c.com/3;https://a.com/1');
+  assert.equal(fromText.length, 3, 'duplicates removed');
+
+  // Accepts an array too.
+  assert.equal(parseBatchUrls(['https://x.com/1', 'https://x.com/1']).length, 1);
+
+  // Adds https:// when the scheme is missing.
+  assert.equal(parseBatchUrls(['example.com/post'])[0], 'https://example.com/post');
+
+  // Drops junk.
+  assert.deepEqual(parseBatchUrls(['not a url', '', '   ', 'http://']), []);
+
+  // Caps at BATCH_LIMIT.
+  const many = Array.from({ length: BATCH_LIMIT + 15 }, (_, i) => `https://s${i}.com/p`);
+  assert.equal(parseBatchUrls(many).length, BATCH_LIMIT);
+});
+
+test('normalizeUrl rejects hosts without a dot', async () => {
+  const { normalizeUrl } = await import('../server/lib/batch.js');
+  assert.equal(normalizeUrl('http://localhost/x'), null);
+  assert.equal(normalizeUrl('http://127.0.0.1/x'), 'http://127.0.0.1/x');
+});
+
+test('HTML has no duplicate element ids', async () => {
+  const { readFileSync } = await import('node:fs');
+  const path = await import('node:path');
+  const html = readFileSync(path.join(process.cwd(), 'public', 'index.html'), 'utf8');
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+  assert.deepEqual(dupes, [], `duplicate ids found: ${[...new Set(dupes)].join(', ')}`);
+});
